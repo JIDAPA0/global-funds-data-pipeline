@@ -24,3 +24,6 @@ validation_output/
 # Build artifacts
 dist/
 build/
+
+# Large local SQL dump
+ft_all_tables.sql
