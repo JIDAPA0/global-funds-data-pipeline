@@ -1,0 +1,59 @@
+services:
+  mysql_db:
+    image: mysql:8
+    container_name: funds_mysql_container
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_DATABASE: funds_db
+      MYSQL_USER: funds_user
+      MYSQL_PASSWORD: funds_pass
+    ports:
+      - "3306:3306"
+    command: >
+      --innodb_buffer_pool_size=4G
+      --innodb_log_buffer_size=256M
+      --innodb_flush_log_at_trx_commit=2
+      --max_allowed_packet=256M
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p1234"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - funds_db_mysql:/var/lib/mysql
+
+  phpmyadmin:
+    image: phpmyadmin
+    container_name: funds_phpmyadmin_container
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql_db
+      PMA_PORT: 3306
+    ports:
+      - "8080:80"
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+    volumes:
+      - phpmyadmin_data:/var/www/html
+
+  pipeline_runner:
+    image: python:3.12-slim
+    container_name: funds_pipeline_runner
+    working_dir: /app
+    tty: true
+    stdin_open: true
+    environment:
+      PYTHONUNBUFFERED: "1"
+      TZ: "America/New_York"
+    volumes:
+      - ./:/app
+    command: ["bash", "-lc", "sleep infinity"]
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+
+volumes:
+  funds_db_mysql:
+  phpmyadmin_data:
