@@ -1,6 +1,6 @@
-# global-fund-data-pipeline
+# global-funds-data-pipeline
 
-Data scraping pipeline for global fund datasets (Financial Times, Yahoo Finance, Stock Analysis).
+Data scraping and ETL pipeline for global fund datasets (Financial Times, Yahoo Finance, Stock Analysis).
 
 ## Setup
 
