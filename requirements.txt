@@ -6,3 +6,4 @@ playwright>=1.49.0
 prefect>=2.19.0,<3.0.0
 requests>=2.32.0
 tqdm>=4.66.0
+yfinance>=0.2.54

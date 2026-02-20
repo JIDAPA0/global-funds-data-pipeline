@@ -9,7 +9,7 @@ services:
       MYSQL_USER: funds_user
       MYSQL_PASSWORD: funds_pass
     ports:
-      - "3306:3306"
+      - "3308:3306"
     command: >
       --innodb_buffer_pool_size=4G
       --innodb_log_buffer_size=256M
@@ -22,6 +22,7 @@ services:
       retries: 10
     volumes:
       - funds_db_mysql:/var/lib/mysql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
 
   phpmyadmin:
     image: phpmyadmin

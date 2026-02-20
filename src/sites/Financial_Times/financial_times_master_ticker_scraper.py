@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import csv
+import itertools
 import random
 import re
 import string
@@ -28,7 +29,7 @@ class FinancialTimesScraperConfig:
     # Funds listing (AJAX)
     funds_api_url: str = "https://markets.ft.com/data/funds/ajax/update-screener-results"
     funds_main_url: str = "https://markets.ft.com/data/funds/uk/results"
-    funds_params: str = "r:f|c:GBR"
+    funds_params: str = "r:f"
     funds_items_per_page: int = 10
 
     # ETFs search
@@ -46,6 +47,7 @@ class FinancialTimesScraperConfig:
     # Batching
     funds_page_batch: int = 200
     etf_query_batch: int = 25
+    funds_fallback_max_page: int = 2000
 
     # SSL
     verify_ssl: bool = True
@@ -377,11 +379,13 @@ async def scrape_funds_full(
             page += 50
             if cfg.sample_funds and len(collected) >= cfg.sample_funds:
                 break
-            if page > 20000:
-                logger.warning("Funds reached safety cap (20,000 pages)")
+            if page > cfg.funds_fallback_max_page:
+                logger.warning("Funds reached safety cap (%s pages)", f"{cfg.funds_fallback_max_page:,}")
                 break
 
     rows = sorted(collected.values(), key=lambda x: x["ft_ticker"])
+    if cfg.sample_funds:
+        rows = rows[: cfg.sample_funds]
     logger.info("Funds completed unique_rows=%s", f"{len(rows):,}")
     return rows
 
@@ -452,9 +456,10 @@ async def scrape_etfs_full(
     semaphore = asyncio.Semaphore(cfg.list_concurrency)
     collected: Dict[str, Dict[str, str]] = {}
 
-    queries = list(string.ascii_lowercase) + [str(i) for i in range(10)]
+    base_chars = list(string.ascii_lowercase) + [str(i) for i in range(10)]
+    queries = list(base_chars)
     if cfg.etf_query_mode == "full":
-        queries += ["".join(pair) for pair in string.ascii_lowercase]
+        queries += ["".join(pair) for pair in itertools.product(base_chars, repeat=2)]
 
     for index in range(0, len(queries), cfg.etf_query_batch):
         batch = queries[index : index + cfg.etf_query_batch]
@@ -472,6 +477,8 @@ async def scrape_etfs_full(
             break
 
     rows = sorted(collected.values(), key=lambda x: x["ft_ticker"])
+    if cfg.sample_etfs:
+        rows = rows[: cfg.sample_etfs]
     logger.info("ETFs completed unique_rows=%s", f"{len(rows):,}")
     return rows
 
@@ -524,7 +531,31 @@ def build_cli_parser() -> argparse.ArgumentParser:
         "--etf-mode",
         choices=["light", "full"],
         default="light",
-        help="ETF query mode: light (a-z + 0-9) or full",
+        help="ETF query mode: light (a-z + 0-9) or full (a-z0-9 + 2-char alnum prefixes)",
+    )
+    parser.add_argument(
+        "--funds-params",
+        type=str,
+        default="r:f",
+        help="FT funds screener params (default: r:f for broader/global coverage)",
+    )
+    parser.add_argument(
+        "--sample-funds",
+        type=int,
+        default=0,
+        help="Limit number of fund rows collected (0 = all)",
+    )
+    parser.add_argument(
+        "--sample-etfs",
+        type=int,
+        default=0,
+        help="Limit number of ETF rows collected (0 = all)",
+    )
+    parser.add_argument(
+        "--funds-fallback-max-page",
+        type=int,
+        default=2000,
+        help="Safety cap for fallback funds paging (default: 2000)",
     )
     return parser
 
@@ -535,6 +566,10 @@ def main() -> None:
     cfg = FinancialTimesScraperConfig()
     cfg.list_concurrency = args.concurrency
     cfg.etf_query_mode = args.etf_mode
+    cfg.funds_params = args.funds_params
+    cfg.funds_fallback_max_page = args.funds_fallback_max_page
+    cfg.sample_funds = args.sample_funds
+    cfg.sample_etfs = args.sample_etfs
 
     asyncio.run(run_scraper(cfg))
 

@@ -20,6 +20,8 @@ venv/
 # Runtime outputs
 logs/
 validation_output/
+data/
+tmp/
 
 # Build artifacts
 dist/
